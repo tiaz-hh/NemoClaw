@@ -196,4 +196,26 @@ RUN --mount=type=bind,source=nemoclaw-blueprint/blueprint.yaml,target=/tmp/bluep
         echo "Error: OpenClaw exec approvals path patch failed"; \
         exit 1; \
     fi \
+    && : "Patch OpenClaw install-safe-path so plugin installs accept symlinked base dirs." \
+    && : "NemoClaw persistence model symlinks ~/.openclaw/extensions -> .openclaw-data/extensions." \
+    && : "OpenClaw TOCTOU guard rejects symlinks as install base; patch to allow real-dir-via-symlink." \
+    && : "Ref: https://github.com/NVIDIA/NemoClaw/issues/2203" \
+    && SYMLINK_CHECK='!baseLstat.isDirectory() || baseLstat.isSymbolicLink()' \
+    && REAL_DIR_CHECK='!baseLstat.isDirectory()' \
+    && files_with_symlink_check="$(grep -R -F --include='*.js' -l "${SYMLINK_CHECK}" "$OPENCLAW_DIST_DIR" || true)" \
+    && if [ -n "$files_with_symlink_check" ]; then \
+        files_with_symlink_check_file="$(mktemp)"; \
+        printf '%s\n' "$files_with_symlink_check" > "$files_with_symlink_check_file"; \
+        while IFS= read -r file; do \
+            sed -i "s#${SYMLINK_CHECK}#${REAL_DIR_CHECK}#g" "$file"; \
+        done < "$files_with_symlink_check_file"; \
+        rm -f "$files_with_symlink_check_file"; \
+    elif ! grep -R -F --include='*.js' -q "${REAL_DIR_CHECK}" "$OPENCLAW_DIST_DIR"; then \
+        echo "Error: Unable to verify OpenClaw install-safe-path symlink check in dist"; \
+        exit 1; \
+    fi \
+    && if grep -R -F --include='*.js' -n "${SYMLINK_CHECK}" "$OPENCLAW_DIST_DIR"; then \
+        echo "Error: OpenClaw install-safe-path symlink check patch failed"; \
+        exit 1; \
+    fi \
     && pip3 install --no-cache-dir --break-system-packages "pyyaml==6.0.3"
