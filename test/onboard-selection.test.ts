@@ -956,22 +956,23 @@ printf '%s' "$status"
 const credentials = require(${credentialsPath});
 const runner = require(${runnerPath});
 
-const answers = ["7", "2", "back", "1", ""];
+// Both bootstrap models installed → extra=[] → Other... stays at index 3 regardless of gpu. (#3251)
+const answers = ["7", "3", "back", "1", ""];
 const messages = [];
 
 credentials.prompt = async (message) => {
   messages.push(message);
   return answers.shift() || "";
 };
-credentials.ensureApiKey = async () => { process.env.NVIDIA_API_KEY = "nvapi-good"; };
+credentials.ensureApiKey = async () => { process.env.NVIDIA_API_KEY="***"; };
 runner.run = () => ({ status: 0 });
 runner.runCapture = (command) => {
   // Normalize: onboard.ts still sends strings, local-inference.ts sends arrays.
   // Once onboard.ts is migrated to argv (#1889), these mocks can assert Array.isArray.
   const cmd = Array.isArray(command) ? command.join(" ") : command;
   if (cmd.includes("command -v ollama")) return "/usr/bin/ollama";
-  if (cmd.includes("127.0.0.1:11434/api/tags")) return JSON.stringify({ models: [{ name: "nemotron-3-nano:30b" }] });
-  if (cmd.includes("ollama list")) return "nemotron-3-nano:30b  abc  24 GB  now";
+  if (cmd.includes("127.0.0.1:11434/api/tags")) return JSON.stringify({ models: [{ name: "nemotron-3-nano:30b" }, { name: "qwen2.5:7b" }] });
+  if (cmd.includes("ollama list")) return "nemotron-3-nano:30b  abc  24 GB  now\nqwen2.5:7b  def  5 GB  now";
   if (cmd.includes("127.0.0.1:8000/v1/models")) return "";
   if (cmd.includes("api/generate")) return '{"response":"hello"}';
   if (cmd.includes("-o args=")) return "node ollama-auth-proxy.js";

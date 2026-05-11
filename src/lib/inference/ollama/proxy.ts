@@ -274,7 +274,15 @@ function isProxyHealthy(): boolean {
 
 async function promptOllamaModel(gpu = null) {
   const installed = getOllamaModelOptions();
-  const options = installed.length > 0 ? installed : getBootstrapOllamaModelOptions(gpu);
+  let options: string[];
+  if (installed.length > 0) {
+    // Append bootstrap models not yet installed so high-memory hosts (e.g. Spark) always show the large model. (#3251)
+    const bootstrapOptions = getBootstrapOllamaModelOptions(gpu);
+    const extra = bootstrapOptions.filter((m) => !installed.includes(m));
+    options = extra.length > 0 ? [...installed, ...extra] : installed;
+  } else {
+    options = getBootstrapOllamaModelOptions(gpu);
+  }
   const defaultModel = getDefaultOllamaModel(gpu);
   const defaultIndex = Math.max(0, options.indexOf(defaultModel));
 
